@@ -1,0 +1,52 @@
+Texture2D shaderTexture[2];
+SamplerState SampleType;
+
+cbuffer LightBuffer
+{
+	float4 diffuseColor;
+	float3 lightDirection;
+};
+
+struct PixelInputType
+{
+    float4 position : SV_POSITION;
+    float2 tex : TEXCOORD0;
+	float3 normal : NORMAL;
+	float3 tangent : TANGENT;
+	float3 binormal : BINORMAL;
+};
+
+float4 BumpMapPixelShader(PixelInputType input) : SV_TARGET
+{
+    float4 textureColor;
+	float4 bumpMap;
+	float3 bumpNormal;
+	float3 lightDir;
+	float lightIntensity;
+	float4 color;
+
+    textureColor = shaderTexture[0].Sample(SampleType, input.tex);
+
+	bumpMap = shaderTexture[1].Sample(SampleType, input.tex);
+	bumpMap = (bumpMap * 2.f) - 1.f; // 범위 (0, 1) -> (-1, 1)
+
+	// 노말맵에서 얻어온 rgb에 탄젠트 행렬 곱함
+	float3x3 matTangent =
+	{
+		input.tangent,
+		input.binormal,
+		input.normal
+	};
+
+	bumpNormal = normalize(mul(bumpMap.xyz, matTangent));
+
+	lightDir = -lightDirection;
+
+	// 범프 값을 기반으로 픽셀의 빛의 양을 계산
+	lightIntensity = saturate(dot(bumpNormal, lightDir));
+
+	color = saturate(diffuseColor * lightIntensity);
+	color = color * textureColor;
+
+    return color;
+}
